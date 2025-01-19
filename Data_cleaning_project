@@ -1,0 +1,155 @@
+----- DATA CLEANING PROJECT
+
+----- 1. IMPORING DATA INTO DATABASE
+----- 1. MAKING A COPY OF RAW DATA AS BACKUP 
+----- 1. REMOVING DUPLICATES
+----- 2. STANADARIZE THE DATA
+----- 3. HANDLING NULL VALUES AND BLANKS
+----- 4. REMOVING COLUMNS
+
+select * from layoffs;
+
+create table layoffs_staging
+as
+select * from layoffs;
+
+select *  from layoffs_staging;
+
+with duplicate_cte as
+(
+select *, row_number() OVER(PARTITION BY company,location,industry,total_laid_off,percentage_laid_off,'date',stage,country,
+funds_raised_millions) as row_num
+from layoffs_staging
+)
+select *
+from duplicate_cte
+where row_num >1;
+
+-------- Unable to delete duplicate data in cte ( CTE IMPLEMENTATION IN MYSQL IS STRICTLY READ ONLY )
+with duplicate_cte as
+(
+select *, row_number() OVER(PARTITION BY company,location,industry,total_laid_off,percentage_laid_off,'date',stage,country,
+funds_raised_millions) as row_num
+from layoffs_staging
+)
+Delete
+from duplicate_cte
+where row_num >1;
+
+-------- CREATED BACKUP TABLE AS COPY TO ADD ROW NUMBER AS COLUMN AND DELETE DATA
+CREATE TABLE `layoffs_staging2` (
+  `company` text,
+  `location` text,
+  `industry` text,
+  `total_laid_off` int DEFAULT NULL,
+  `percentage_laid_off` text,
+  `date` text,
+  `stage` text,
+  `country` text,
+  `funds_raised_millions` int DEFAULT NULL,
+  row_num int
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+select *  from layoffs_staging2;
+
+-------- INSERTING ROWNUMBER AS COLUMN IN BACKUP TABLE
+INSERT INTO layoffs_staging2
+select *, row_number() OVER(PARTITION BY company,location,industry,total_laid_off,percentage_laid_off,'date',stage,country,
+funds_raised_millions) as row_num
+from layoffs_staging;
+
+select *  from layoffs_staging2
+WHERE row_num>1;
+
+-------- DELETING TABLE USING ROWNUMBER
+Delete  from layoffs_staging2
+WHERE row_num > 1;
+  
+select *  from layoffs_staging2;
+
+select company , TRIM(COMPANY)
+from layoffs_staging2;
+
+Update layoffs_staging2
+set company =  TRIM(COMPANY) ;
+
+select distinct industry
+from layoffs_staging2
+order by 1;
+
+select *
+from layoffs_staging2
+where industry like 'crypto%' ;
+
+ALTER TABLE layoffs_staging2
+MODIFY COLUMN date date;
+
+update layoffs_staging2
+set industry = 'crypto'
+where industry like 'Crypto%' ;
+
+select *
+from layoffs_staging2
+where country like 'United states%' ;
+
+select distinct country
+from layoffs_staging2
+ORDER BY 1;
+
+update layoffs_staging2
+set COUNTRY = 'United States'
+where country like 'United states%' ;
+
+SELECT DATE, 
+str_to_date(DATE,'%m/%d/%Y') AS DATE
+FROM  layoffs_staging2;
+
+UPDATE  layoffs_staging2
+SET DATE = str_to_date(DATE,'%m/%d/%Y');
+
+select *
+from layoffs_staging2
+where industry IS NULL	OR  industry = '';
+
+select *
+from layoffs_staging2
+where company ='airbnb';
+
+select t1.industry, t2.industry
+from layoffs_staging2 t1
+join layoffs_staging2 t2
+on t1.company = t2.company
+and t1.location = t2.location
+where t1.industry IS NULL 
+AND t2.industry is not null;
+
+update layoffs_staging2
+set industry = null
+where industry = '';
+
+update layoffs_staging2 t1
+join layoffs_staging2 t2
+on t1.company = t2.company
+and t1.location = t2.location
+set t1.industry = t2.industry
+where t1.industry IS NULL 
+AND t2.industry is not null;
+
+select *
+from layoffs_staging2
+where industry IS NULL	OR  industry = '';
+
+select *
+from layoffs_staging2
+where total_laid_off is null
+and percentage_laid_off is null;
+
+-------- DELETING UNUSABLE COLUMN WHICH CONTAIN NULL VALUES IN MULTIPLE ROWS
+delete
+from layoffs_staging2
+where total_laid_off is null
+and percentage_laid_off is null;
+
+----------- REMOVING UNNECESSARY COLUMNS
+ALTER TABLE layoffs_staging2
+drop column row_num;
