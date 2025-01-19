@@ -1,0 +1,96 @@
+select * from layoffs_staging2;
+
+-------- count of records in rawdata
+SELECT count(*) FROM layoffs_staging2 ;
+
+------- earliest date of layoff
+SELECT * 
+FROM layoffs_staging2
+WHERE DATE = (SELECT min(DATE)
+FROM  layoffs_staging2);
+
+------- latest date of layoff
+SELECT * 
+FROM layoffs_staging2
+WHERE DATE = (SELECT max(DATE)
+FROM  layoffs_staging2);
+
+---- maximum employees laid_off
+SELECT max(total_laid_off)
+FROM layoffs_staging2;
+
+------- total employees laid of by company
+SELECT COMPANY , SUM(TOTAL_LAID_OFF)
+FROM layoffs_staging2
+GROUP BY company
+ORDER BY 2 DESC;
+
+------- total employees laid of by industry
+SELECT industry , SUM(TOTAL_LAID_OFF)
+FROM layoffs_staging2
+GROUP BY industry
+ORDER BY 2 DESC;
+
+------- total employees laid of by country
+SELECT country , SUM(TOTAL_LAID_OFF)
+FROM layoffs_staging2
+GROUP BY country
+ORDER BY 2 DESC;
+
+------- total employees laid of by year
+SELECT year(DATE) , SUM(TOTAL_LAID_OFF)
+FROM layoffs_staging2
+GROUP BY year(DATE)
+ORDER BY 1 DESC;
+
+------- total employees laid of by date
+SELECT date , SUM(TOTAL_LAID_OFF)
+FROM layoffs_staging2
+GROUP BY date
+ORDER BY 1 DESC;
+
+------- extracting month from date column using substring
+SELECT substring(DATE,6,2) AS MONTH
+FROM layoffs_staging2; 
+
+------- total employees laid of by month/year
+SELECT substring(DATE,1,7) AS MONTH ,SUM(TOTAL_LAID_OFF) AS SUMX
+FROM layoffs_staging2
+GROUP BY substring(DATE,1,7)
+ORDER BY 1 DESC;
+
+----  rolling total of employees laid off by month/year
+WITH ROLLING_TOTAL 
+AS
+(
+SELECT substring(DATE,1,7) AS month ,SUM(TOTAL_LAID_OFF) AS SUMX
+FROM layoffs_staging2
+WHERE substring(DATE,1,7) IS NOT NULL
+GROUP BY month
+ORDER BY 1 asc
+)
+SELECT month, SUMX, SUM(SUMX) OVER(order by month) as ROLLING_TOTAL
+FROM ROLLING_TOTAL;
+
+---- total employees laid off by conpany/year ( grouped)
+SELECT COMPANY , year(date), SUM(TOTAL_LAID_OFF)
+FROM layoffs_staging2
+GROUP BY company, year(date) 
+ORDER BY 3 desc ;
+
+-------- top 5 companies which laid off maximum employees per year
+with company_year ( company,years,total_laid_off)
+as 
+(
+SELECT COMPANY , year(date), SUM(TOTAL_LAID_OFF)
+FROM layoffs_staging2
+GROUP BY company, year(date) 
+), ranking_table as
+(
+select  *, DENSE_RANK() over(partition by  years order by total_laid_off DESC) AS RANKING
+from company_year
+where years IS NOT NULL
+)
+select * 
+from ranking_table
+where ranking <=5;
